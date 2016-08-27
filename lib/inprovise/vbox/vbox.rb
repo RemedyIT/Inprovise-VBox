@@ -168,7 +168,7 @@ module Inprovise::VBox
           unless vbox.no_node
             # get MAC and IP for VM
             log("Determining IP address for VBox #{vbox.name}. Please wait ...".bold)
-            mac, addr = trigger '$vbox:vbox-ifaddr'
+            mac, addr = trigger '$vbox:vbox-ifaddr', vbox.name
             log("VBox #{vbox.name} : mac=#{mac}, addr=#{addr}") if Inprovise.verbosity > 0
             vbox_opts = vbox.to_h
             vbox_opts.delete(:no_node)
