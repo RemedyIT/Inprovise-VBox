@@ -7,8 +7,8 @@ require 'digest/md5'
 
 module Inprovise::VBox
 
-  # add a common '$vbox' script defining all common actions
-  Inprovise::DSL.script '$vbox' do
+  # add a common 'vbox' script defining all common actions
+  Inprovise::DSL.script 'vbox' do
     # add standard actions
     action('vbox-shutdown') do |vboxname|
       sudo("virsh shutdown #{vboxname}")
@@ -113,7 +113,7 @@ module Inprovise::VBox
               raise ArgumentError, "VBox #{vbox.name} clashes with existing #{type}"
             end
           end
-          trigger '$vbox:vbox-verify', vbox.name, (command == :apply && vbox.autostart)
+          trigger 'vbox:vbox-verify', vbox.name, (command == :apply && vbox.autostart)
         end
 
         # apply : installation
@@ -141,22 +141,22 @@ module Inprovise::VBox
           sudo(cmdline)
           10.times do
             sleep(1)
-            break if trigger '$vbox:vbox-verify', vbox.name, vbox.autostart
+            break if trigger 'vbox:vbox-verify', vbox.name, vbox.autostart
           end
         end
 
         # revert : uninstall
         revert do
-          trigger '$vbox:vbox-shutdown', vbox.name
+          trigger 'vbox:vbox-shutdown', vbox.name
           30.times do
             sleep(1)
-            break unless trigger '$vbox:vbox-verify', vbox.name
+            break unless trigger 'vbox:vbox-verify', vbox.name
           end
-          if trigger('$vbox:vbox-verify', vbox.name)
-            trigger('$vbox:vbox-kill', vbox.name)
+          if trigger('vbox:vbox-verify', vbox.name)
+            trigger('vbox:vbox-kill', vbox.name)
             sleep(1)
           end
-          trigger('$vbox:vbox-delete', vbox.name) unless trigger('$vbox:vbox-verify', vbox.name)
+          trigger('vbox:vbox-delete', vbox.name) unless trigger('vbox:vbox-verify', vbox.name)
         end
       end
 
@@ -168,7 +168,7 @@ module Inprovise::VBox
           unless vbox.no_node
             # get MAC and IP for VM
             log("Determining IP address for VBox #{vbox.name}. Please wait ...".bold)
-            mac, addr = trigger '$vbox:vbox-ifaddr', vbox.name
+            mac, addr = trigger 'vbox:vbox-ifaddr', vbox.name
             log("VBox #{vbox.name} : mac=#{mac}, addr=#{addr}") if Inprovise.verbosity > 0
             vbox_opts = vbox.to_h
             vbox_opts.delete(:no_node)
