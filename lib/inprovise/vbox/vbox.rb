@@ -29,14 +29,10 @@ module Inprovise::VBox
     end
     action 'vbox-ifaddr' do |vboxname|
       result = []
-      300.times do
-        sleep(5)
-        out = sudo("virsh domifaddr #{vboxname}").split("\n").last.strip
-        unless /-+/ =~ out
-          _, mac, _, net = out.split(' ')
-          result << mac << net.split('/').first
-          break
-        end
+      out = sudo("virsh domifaddr #{vboxname}").split("\n").last.strip
+      unless /-+/ =~ out
+        _, mac, _, net = out.split(' ')
+        result << mac << net.split('/').first
       end
       result
     end
@@ -167,16 +163,29 @@ module Inprovise::VBox
         apply do
           unless vbox.no_node
             # get MAC and IP for VM
-            log("Determining IP address for VBox #{vbox.name}. Please wait ...".bold)
-            mac, addr = trigger 'vbox:vbox-ifaddr', vbox.name
+            log.print("Determining IP address for VBox #{vbox.name}. Please wait ...|".bold)
+            mac = addr = nil
+            150.times do |n|
+              sleep(2)
+              log.print("\b" + %w{| / - \\}[(n+1) % 4].bold)
+              mac, addr = trigger 'vbox:vbox-ifaddr', vbox.name
+              if addr
+                break
+              end
+            end
+            log("\bdone".bold)
+            raise RuntimeError, "Failed to determin IP address for VBox #{vbox.name}" unless addr
             log("VBox #{vbox.name} : mac=#{mac}, addr=#{addr}") if Inprovise.verbosity > 0
             vbox_opts = vbox.to_h
             vbox_opts.delete(:no_node)
             vbox_opts.delete(:no_sniff)
             node = Inprovise::Infrastructure::Node.new(vbox.name, {:host => addr, :user => vbox.user, :vbox => vbox_opts})
             Inprovise::Infrastructure.save
-            Inprovise::Sniffer.run_sniffers_for(node) unless vbox.no_sniff
-            Inprovise::Infrastructure.save
+            unless vbox.no_sniff
+              # retry on (comm) failure
+              Inprovise::Sniffer.run_sniffers_for(node) rescue Inprovise::Sniffer.run_sniffers_for(node)
+              Inprovise::Infrastructure.save
+            end
             log("Added new node #{node.to_s}".bold)
           end
         end
