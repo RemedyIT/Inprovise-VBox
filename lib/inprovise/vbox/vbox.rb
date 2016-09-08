@@ -17,9 +17,10 @@ module Inprovise::VBox
     action('vbox-start') do |vboxname|
       sudo("virsh start #{vboxname}")
     end
-    action('vbox-verify') do |vboxname, autostart=false|
+    action('vbox-verify') do |vboxname, running=false, autostart=false|
       vbox_info = sudo("virsh dominfo #{vboxname}").gsub("\n", ' ')
-      vbox_info =~ /name:\s+#{vboxname}\s.*state:\s+running/i &&
+      vbox_info =~ /name:\s+#{vboxname}/i &&
+        (!running || vbox_info =~ /state:\s+running/i) &&
         (!autostart || vbox_info =~ /autostart:\s+enable/i)
     end
     action('vbox-delete') do |vboxname|
@@ -75,14 +76,18 @@ module Inprovise::VBox
         # verify VM
         validate do
           vmname = vbs.vbox_name(self)
-          # look for existing target with VM name on :apply unless node creation is suppressed
-          if command == :apply && !vbs.vbox_no_node(self)
-            if tgt = Inprovise::Infrastructure.find(vmname)
-              type = Inprovise::Infrastructure::Group === tgt ? 'group' : 'node'
-              raise ArgumentError, "VBox #{vmname} clashes with existing #{type}"
+          if trigger 'vbox:vbox-verify', vmname
+            true  # vm with this name already running
+          else
+            # look for existing target with VM name on :apply unless node creation is suppressed
+            if command == :apply && !vbs.vbox_no_node(self)
+              if tgt = Inprovise::Infrastructure.find(vmname)
+                type = Inprovise::Infrastructure::Group === tgt ? 'group' : 'node'
+                raise ArgumentError, "VBox #{vmname} clashes with existing #{type}"
+              end
             end
+            false
           end
-          trigger 'vbox:vbox-verify', vmname, (command == :apply && vbs.vbox_autostart(self))
         end
 
         # apply : installation
@@ -112,31 +117,43 @@ module Inprovise::VBox
           sudo(cmdline)
           10.times do
             sleep(1)
-            break if trigger 'vbox:vbox-verify', vmname, vbs.vbox_autostart(self)
+            break if trigger 'vbox:vbox-verify', vmname, true, vbs.vbox_autostart(self)
           end
         end
 
         # revert : uninstall
         revert do
           vmname = vbs.vbox_name(self)
-          trigger 'vbox:vbox-shutdown', vmname
-          log.print("Waiting for shutdown of VBox #{vmname}. Please wait ...|".bold)
-          30.times do |n|
-            sleep(1)
-            log.print("\b" + %w{| / - \\}[(n+1) % 4].bold)
-            break unless trigger 'vbox:vbox-verify', vmname
+          if trigger 'vbox:vbox-verify', vmname, true
+            trigger 'vbox:vbox-shutdown', vmname
+            log.print("Waiting for shutdown of VBox #{vmname}. Please wait ...|".bold)
+            30.times do |n|
+              sleep(1)
+              log.print("\b" + %w{| / - \\}[(n+1) % 4].bold)
+              break unless trigger 'vbox:vbox-verify', vmname, true
+            end
+            if trigger('vbox:vbox-verify', vmname, true)
+              trigger('vbox:vbox-kill', vmname)
+              sleep(1)
+            end
+            log.println("\bdone".bold)
           end
-          if trigger('vbox:vbox-verify', vmname)
-            trigger('vbox:vbox-kill', vmname)
-            sleep(1)
-          end
-          log.println("\bdone".bold)
-          trigger('vbox:vbox-delete', vmname) unless trigger('vbox:vbox-verify', vmname)
+          trigger('vbox:vbox-delete', vmname) unless trigger('vbox:vbox-verify', vmname, true)
         end
       end
 
       # 2. add an Inprovise node if the VM was installed successfully
       @node_script = Inprovise::DSL.script "#{name}#vbox_node" do
+
+        validate do
+          vmname = vbs.vbox_name(self)
+          if tgt = Inprovise::Infrastructure.find(vmname)
+            raise ArgumentError, "VBox #{vmname} clashes with existing group" if Inprovise::Infrastructure::Group === tgt
+            true
+          else
+            false
+          end
+        end
 
         # add a node object for the new VM unless suppressed
         apply do
@@ -160,11 +177,10 @@ module Inprovise::VBox
             vbox_opts.delete(:no_node)
             vbox_opts.delete(:no_sniff)
             node_opts = vbox_opts.delete(:node) || {}
-            node_name = node_opts.delete(:name) || vmname
             node_opts[:host] ||= addr
             node_opts[:user] ||= vbs.vbox_user(self)
             node_opts[:vbox] = vbox_opts
-            node = Inprovise::Infrastructure::Node.new(node_name, node_opts)
+            node = Inprovise::Infrastructure::Node.new(vmname, node_opts)
             Inprovise::Infrastructure.save
             unless vbs.vbox_no_sniff(self)
               # retry on (comm) failure
