@@ -67,71 +67,71 @@ module Inprovise::VBox
       # generate name if none set
       configuration[:name] ||= "#{name}_#{self.hash}_#{Time.now.to_f}"
 
-      vbox_script = self
-      vbox_scrname = self.name
+      vbs = self
       # define the scripts that do the actual work as dependencies
       # 1. install the virtual machine
       @vm_script = Inprovise::DSL.script "#{name}#vbox_vm" do
 
         # verify VM
         validate do
-          vbox_cfg = config[vbox_scrname.to_sym]
+          vmname = vbs.vbox_name(self)
           # look for existing target with VM name on :apply unless node creation is suppressed
-          if command == :apply && !vbox_cfg.no_node
-            if tgt = Inprovise::Infrastructure.find(vbox_cfg.name)
+          if command == :apply && !vbs.vbox_no_node(self)
+            if tgt = Inprovise::Infrastructure.find(vmname)
               type = Inprovise::Infrastructure::Group === tgt ? 'group' : 'node'
-              raise ArgumentError, "VBox #{vbox_cfg.name} clashes with existing #{type}"
+              raise ArgumentError, "VBox #{vmname} clashes with existing #{type}"
             end
           end
-          trigger 'vbox:vbox-verify', vbox_cfg.name, (command == :apply && vbox_cfg.autostart)
+          trigger 'vbox:vbox-verify', vmname, (command == :apply && vbs.vbox_autostart(self))
         end
 
         # apply : installation
         apply do
-          vbox_cfg = config[vbox_scrname.to_sym]
+          vmname = vbs.vbox_name(self)
+          vmimg = vbs.vbox_image(self)
           # 1. verify config
-          raise ArgumentError, "Cannot access VBox image #{vbox_cfg.image}" unless remote(vbox_cfg.image).file?
+          raise ArgumentError, "Cannot access VBox image #{vmimg}" unless remote(vmimg).file?
           # 2. execute virt-install
-          log("Installing VBox #{vbox_cfg.name}".bold)
+          log("Installing VBox #{vmname}".bold)
           cmdline = 'virt-install --connect qemu:///system --hvm --virt-type kvm --import --wait 0 '
-          cmdline << '--autostart ' if vbox_cfg.autostart
-          cmdline << "--name #{vbox_cfg.name} --memory #{vbox_cfg.memory} --vcpus #{vbox_cfg.cpus} "
-          cmdline << "--os-variant #{vbox_cfg.os} " if vbox_cfg.os
-          cmdline << case vbox_cfg.network
+          cmdline << '--autostart ' if vbs.vbox_autostart(self)
+          cmdline << "--name #{vmname} --memory #{vbs.vbox_memory(self)} --vcpus #{vbs.vbox_cpus(self)} "
+          cmdline << "--os-variant #{vbs.vbox_os(self)} " if vbs.vbox_os(self)
+          cmdline << case vbs.vbox_network(self)
                      when :hostnet
-                       "--network network=#{vbox_cfg.netname || 'default'} "
+                       "--network network=#{vbs.vbox_netname(self) || 'default'} "
                      when :bridge
-                       "--network bridge=#{vbox_cfg.netname || 'virbr0' } "
+                       "--network bridge=#{vbs.vbox_netname(self) || 'virbr0' } "
                      end
           cmdline << '--graphics spice '
-          cmdline << "--disk path=#{vbox_cfg.image},device=disk,boot_order=1"
-          cmdline << ",bus=#{vbox_cfg.diskbus}" if vbox_cfg.diskbus
-          cmdline << ",format=#{vbox_cfg.format}" if vbox_cfg.format
+          cmdline << "--disk path=#{vbs.vbox_image(self)},device=disk,boot_order=1"
+          cmdline << ",bus=#{vbs.vbox_diskbus(self)}" if vbs.vbox_diskbus(self)
+          cmdline << ",format=#{vbs.vbox_format(self)}" if vbs.vbox_format(self)
           cmdline << ' --disk device=cdrom,boot_order=2,bus=ide'
-          cmdline << " #{vbox_cfg.install_opts}" if vbox_cfg.install_opts
+          cmdline << " #{vbs.vbox_install_opts(self)}" if vbs.vbox_install_opts(self)
           sudo(cmdline)
           10.times do
             sleep(1)
-            break if trigger 'vbox:vbox-verify', vbox_cfg.name, vbox_cfg.autostart
+            break if trigger 'vbox:vbox-verify', vmname, vbs.vbox_autostart(self)
           end
         end
 
         # revert : uninstall
         revert do
-          vbox_cfg = config[vbox_scrname.to_sym]
-          trigger 'vbox:vbox-shutdown', vbox_cfg.name
-          log.print("Waiting for shutdown of VBox #{vbox_cfg.name}. Please wait ...|".bold)
+          vmname = vbs.vbox_name(self)
+          trigger 'vbox:vbox-shutdown', vmname
+          log.print("Waiting for shutdown of VBox #{vmname}. Please wait ...|".bold)
           30.times do |n|
             sleep(1)
             log.print("\b" + %w{| / - \\}[(n+1) % 4].bold)
-            break unless trigger 'vbox:vbox-verify', vbox_cfg.name
+            break unless trigger 'vbox:vbox-verify', vmname
           end
-          if trigger('vbox:vbox-verify', vbox_cfg.name)
-            trigger('vbox:vbox-kill', vbox_cfg.name)
+          if trigger('vbox:vbox-verify', vmname)
+            trigger('vbox:vbox-kill', vmname)
             sleep(1)
           end
           log.println("\bdone".bold)
-          trigger('vbox:vbox-delete', vbox_cfg.name) unless trigger('vbox:vbox-verify', vbox_cfg.name)
+          trigger('vbox:vbox-delete', vmname) unless trigger('vbox:vbox-verify', vmname)
         end
       end
 
@@ -140,47 +140,52 @@ module Inprovise::VBox
 
         # add a node object for the new VM unless suppressed
         apply do
-          vbox_cfg = config[vbox_scrname.to_sym]
-          unless vbox_cfg.no_node
+          vmname = vbs.vbox_name(self)
+          unless vbs.vbox_no_node(self)
             # get MAC and IP for VM
-            log.print("Determining IP address for VBox #{vbox_cfg.name}. Please wait ...|".bold)
+            log.print("Determining IP address for VBox #{vmname}. Please wait ...|".bold)
             mac = addr = nil
             150.times do |n|
               sleep(2)
               log.print("\b" + %w{| / - \\}[(n+1) % 4].bold)
-              mac, addr = trigger 'vbox:vbox-ifaddr', vbox_cfg.name
+              mac, addr = trigger 'vbox:vbox-ifaddr', vmname
               if addr
                 break
               end
             end
             log.println("\bdone".bold)
-            raise RuntimeError, "Failed to determin IP address for VBox #{vbox_cfg.name}" unless addr
-            log("VBox #{vbox_cfg.name} : mac=#{mac}, addr=#{addr}") if Inprovise.verbosity > 0
-            vbox_opts = vbox_cfg.to_h
+            raise RuntimeError, "Failed to determin IP address for VBox #{vmname}" unless addr
+            log("VBox #{vmname} : mac=#{mac}, addr=#{addr}") if Inprovise.verbosity > 0
+            vbox_opts = vbs.vbox_config_hash(self)
             vbox_opts.delete(:no_node)
             vbox_opts.delete(:no_sniff)
-            node = Inprovise::Infrastructure::Node.new(vbox_cfg.name, {:host => addr, :user => vbox_cfg.user, :vbox => vbox_opts})
+            node_opts = vbox_opts.delete(:node) || {}
+            node_name = node_opts.delete(:name) || vmname
+            node_opts[:host] ||= addr
+            node_opts[:user] ||= vbs.vbox_user(self)
+            node_opts[:vbox] = vbox_opts
+            node = Inprovise::Infrastructure::Node.new(node_name, node_opts)
             Inprovise::Infrastructure.save
-            unless vbox_cfg.no_sniff
+            unless vbs.vbox_no_sniff(self)
               # retry on (comm) failure
               Inprovise::Sniffer.run_sniffers_for(node) rescue Inprovise::Sniffer.run_sniffers_for(node)
               Inprovise::Infrastructure.save
             end
-            log("Added new node #{node.to_s}".bold)
+            log("Added new node #{node}".bold)
           end
         end
 
         # remove the node object for the VM unless node creation suppressed
         revert do
-          vbox_cfg = config[vbox_scrname.to_sym]
-          unless vbox_cfg.no_node
-            tgt = Inprovise::Infrastructure.find(vbox_cfg.name)
+          vmname = vbs.vbox_name(self)
+          unless vbs.vbox_no_node(self)
+            tgt = Inprovise::Infrastructure.find(vmname)
             if tgt && Inprovise::Infrastructure::Node === tgt
-              Inprovise::Infrastructure.deregister(vbox_cfg.name)
+              Inprovise::Infrastructure.deregister(vmname)
               Inprovise::Infrastructure.save
-              log("Removed node #{tgt.to_s}".bold)
+              log("Removed node #{tgt}".bold)
             else
-              log("No existing node #{vbox_cfg.name} found!".yellow)
+              log("No existing node #{vmname} found!".yellow)
             end
           end
         end
@@ -193,6 +198,92 @@ module Inprovise::VBox
 
       self
     end
+
+    def vbox_name(context)
+      value_for context, context.config[name.to_sym][:name]
+    end
+
+    def vbox_autostart(context)
+      value_for context, context.config[name.to_sym][:autostart]
+    end
+
+    def vbox_no_node(context)
+      value_for context, context.config[name.to_sym][:no_node]
+    end
+
+    def vbox_no_sniff(context)
+      value_for context, context.config[name.to_sym][:no_sniff]
+    end
+
+    def vbox_image(context)
+      value_for context, context.config[name.to_sym][:image]
+    end
+
+    def vbox_memory(context)
+      value_for context, context.config[name.to_sym][:memory]
+    end
+
+    def vbox_cpus(context)
+      value_for context, context.config[name.to_sym][:cpus]
+    end
+
+    def vbox_network(context)
+      value_for context, context.config[name.to_sym][:network]
+    end
+
+    def vbox_netname(context)
+      value_for context, context.config[name.to_sym][:netname]
+    end
+
+    def vbox_os(context)
+      value_for context, context.config[name.to_sym][:os]
+    end
+
+    def vbox_user(context)
+      value_for context, context.config[name.to_sym][:user]
+    end
+
+    def vbox_diskbus(context)
+      value_for context, context.config[name.to_sym][:diskbus]
+    end
+
+    def vbox_format(context)
+      value_for context, context.config[name.to_sym][:format]
+    end
+
+    def vbox_install_opts(context)
+      value_for context, context.config[name.to_sym][:install_opts]
+    end
+
+    def vbox_config_hash(context)
+      context.config[name.to_sym].to_h.reduce({}) do |h, (k,v)|
+        case h[k] = value_for(context, v)
+          when OpenStruct
+          h[k] = config_to_hash(h[k])
+        end
+        h
+      end
+    end
+
+    def config_to_hash(cfg)
+      cfg.to_h.reduce({}) do |h, (k,v)|
+        h[k] = case v
+          when OpenStruct
+          config_to_hash(v)
+          else
+          v
+        end
+        h
+      end
+    end
+    private :config_to_hash
+
+    def value_for(context, option)
+      return nil if option.nil?
+      return context.instance_exec(&option) if option.respond_to?(:call)
+      option
+    end
+    private :value_for
 
   end
 
