@@ -6,10 +6,5 @@
 require 'rubygems'
 require 'inprovise'
 
-module Inprovise::VBox
-
-  VERSION = '0.1.1'
-
-end
-
+require_relative './vbox/version'
 require_relative './vbox/vbox'
