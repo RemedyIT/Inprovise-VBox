@@ -1,0 +1,28 @@
+before_install:
+- gem install bundler
+bundler_args: "--verbose"
+script: rake test
+rvm:
+- 2.0.0
+- 2.1
+- 2.2
+- 2.3.1
+- ruby-head
+gemfile:
+- Gemfile
+matrix:
+  allow_failures:
+  - rvm: ruby-head
+env: CODECLIMATE_REPO_TOKEN=51a7528ab077cda4ebd4da477c44f326c2a2524c4568af9511b8e8d0c1bcc876
+  bundle exec rake
+addons:
+  code_climate:
+    repo_token: 51a7528ab077cda4ebd4da477c44f326c2a2524c4568af9511b8e8d0c1bcc876
+deploy:
+  provider: rubygems
+  api_key:
+    secure: c2FbOO1vcAeHp4hCW/P0XEtfB1jbjS5S1LhnnCSOqM+j37UHqz2pd98CqUdpawA+1o68GtWnqhpJkC5+zx8CM+rE3lNB0SSXk98UqFeCQw/2HlEAn1hkfqxbstNI+wIa7gF7tmZ6ZTtuiPO0JovaknFfu8o2IMZrpf1LOsTrBv+GT3nm32B5b0iJszAwwsPMzvnglHP0lOJjgzxzDK+RtfIujYewJZ/Nr4DEobPDtnTw0gG2Bc1f0GiCWWr38PvNxdH0i7PlVWplAfC/WMRdgdVbxxUNnZBuw0wyRrSmxjWrArhEI6y3qobgduWvYOaddyInViI99wb+M6NV8F86IXnlw2AdK797En5z2ofdvJkUIDAqLJLZ6Q46DfINxH3HtlorVz1C0EOidVEFyP2/SDaMClWbCHGCGTBpUy706BjgDhcpOV6A1uykFjd963hiI7vP6WwgHNtgrW7tZCfK+A+yeh9z8lF/1rW6alS6v1OYfZoqQvfafwLFfCY0Hgheowy0G5azdL7LjP9/aDFkZxohj3UKFfv4//kfcIgTl7BmlbVAxqGMcXhkRq5qL4bcFpdsMzUI1RprJTsmF/fWFFA2En0Oy4aSkkt3IEhgcmCxEGnJmJNNhPadl8Lez7ONi7EhcQm8gUPr5Afz50ywQKSpO6JBVIXe69toLQHYDOg=
+  gemspec: inprovise-vbox.gemspec
+  on:
+    tags: true
+    repo: mcorino/Inprovide-VBox
