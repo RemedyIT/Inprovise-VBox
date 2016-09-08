@@ -3,8 +3,6 @@
 # Author::    Martin Corino
 # License::   Distributes under the same license as Ruby
 
-require 'digest/md5'
-
 module Inprovise::VBox
 
   # add a common 'vbox' script defining all common actions
@@ -40,7 +38,7 @@ module Inprovise::VBox
 
   class VBoxScript < Inprovise::Script
 
-    # config
+    # configuration
     #     :name
     #     :image
     #     :format
@@ -53,16 +51,6 @@ module Inprovise::VBox
     #     :autostart
     #     :install_opts
 
-    class DSL < Inprovise::Script::DSL
-
-      def configure(cfg = {}, &block)
-        @script.configure(cfg, &block)
-      end
-
-    end
-
-    attr_reader :config, :config_action
-
     def initialize(name)
       super(name)
       @vm_script = nil
@@ -70,30 +58,22 @@ module Inprovise::VBox
     end
 
     def setup
+      # verify mandatory configuration
+      raise ArgumentError, "Missing required configuration for vbox script #{name}" unless Hash === configuration || OpenStruct === configuration
+      # take care of defaults
+      configuration[:memory] ||= 1024
+      configuration[:cpus] ||= 1
+      configuration[:network] ||= :hostnet
+      # generate name if none set
+      configuration[:name] ||= "#{name}_#{self.hash}_#{Time.now.to_f}"
+
       vbox_script = self
       vbox_scrname = self.name
       # define the scripts that do the actual work as dependencies
       # 1. install the virtual machine
       @vm_script = Inprovise::DSL.script "#{name}#vbox_vm" do
 
-        # first validation action must be handling config
-        validate do
-          # make sure to initialize configuration only once
-          vbox_cfg = config[vbox_scrname.to_sym]
-          raise ArgumentError, "Missing required configuration for vbox script #{vbox_scrname}" unless vbox_cfg
-          unless vbox_cfg.vbox_configured?
-            # take care of defaults
-            vbox_cfg.memory ||= 1024
-            vbox_cfg.cpus ||= 1
-            vbox_cfg.network ||= :hostnet
-            # generate name if none set
-            vbox_cfg.name ||= "#{vbox_scrname}_#{Digest::MD5.hexdigest(node.name+Time.now.to_s)}"
-            vbox_cfg[:'vbox_configured?'] = true
-          end
-          true # this validation step always returns true
-        end
-
-        # next validation step is actual VM verification
+        # verify VM
         validate do
           vbox_cfg = config[vbox_scrname.to_sym]
           # look for existing target with VM name on :apply unless node creation is suppressed
@@ -150,7 +130,7 @@ module Inprovise::VBox
             trigger('vbox:vbox-kill', vbox_cfg.name)
             sleep(1)
           end
-          log.print("\bdone".bold)
+          log.println("\bdone".bold)
           trigger('vbox:vbox-delete', vbox_cfg.name) unless trigger('vbox:vbox-verify', vbox_cfg.name)
         end
       end
@@ -173,7 +153,7 @@ module Inprovise::VBox
                 break
               end
             end
-            log.print("\bdone".bold)
+            log.println("\bdone".bold)
             raise RuntimeError, "Failed to determin IP address for VBox #{vbox_cfg.name}" unless addr
             log("VBox #{vbox_cfg.name} : mac=#{mac}, addr=#{addr}") if Inprovise.verbosity > 0
             vbox_opts = vbox_cfg.to_h
