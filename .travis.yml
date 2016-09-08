@@ -25,4 +25,4 @@ deploy:
   gemspec: inprovise-vbox.gemspec
   on:
     tags: true
-    repo: mcorino/Inprovide-VBox
+    repo: mcorino/Inprovise-VBox
