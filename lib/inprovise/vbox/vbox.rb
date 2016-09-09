@@ -62,6 +62,7 @@ module Inprovise::VBox
       # verify mandatory configuration
       raise ArgumentError, "Missing required configuration for vbox script #{name}" unless Hash === configuration || OpenStruct === configuration
       # take care of defaults
+      configuration[:arch] ||= 'x86_64'
       configuration[:memory] ||= 1024
       configuration[:cpus] ||= 1
       configuration[:network] ||= :hostnet
@@ -99,6 +100,7 @@ module Inprovise::VBox
           # 2. execute virt-install
           log("Installing VBox #{vmname}".bold)
           cmdline = 'virt-install --connect qemu:///system --hvm --virt-type kvm --import --wait 0 '
+          cmdline << "--arch #{vbs.vbox_arch(self)} "
           cmdline << '--autostart ' if vbs.vbox_autostart(self)
           cmdline << "--name #{vmname} --memory #{vbs.vbox_memory(self)} --vcpus #{vbs.vbox_cpus(self)} "
           cmdline << "--os-variant #{vbs.vbox_os(self)} " if vbs.vbox_os(self)
@@ -233,6 +235,10 @@ module Inprovise::VBox
 
     def vbox_image(context)
       value_for context, context.config[name.to_sym][:image]
+    end
+
+    def vbox_arch(context)
+      value_for context, context.config[name.to_sym][:arch]
     end
 
     def vbox_memory(context)
