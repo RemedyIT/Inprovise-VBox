@@ -59,15 +59,14 @@ module Inprovise::VBox
     end
 
     def setup
-      # verify mandatory configuration
-      raise ArgumentError, "Missing required configuration for vbox script #{name}" unless Hash === configuration || OpenStruct === configuration
       # take care of defaults
-      configuration[:arch] ||= 'x86_64'
-      configuration[:memory] ||= 1024
-      configuration[:cpus] ||= 1
-      configuration[:network] ||= :hostnet
+      @configuration ||= {}
+      @configuration[:arch] ||= 'x86_64'
+      @configuration[:memory] ||= 1024
+      @configuration[:cpus] ||= 1
+      @configuration[:network] ||= :hostnet
       # generate name if none set
-      configuration[:name] ||= "#{name}_#{self.hash}_#{Time.now.to_f}"
+      @configuration[:name] ||= "#{name}_#{self.hash}_#{Time.now.to_f}"
 
       vbs = self
       # define the scripts that do the actual work as dependencies
@@ -98,7 +97,7 @@ module Inprovise::VBox
           # 1. verify config
           raise ArgumentError, "Cannot access VBox image #{vmimg}" unless remote(vmimg).file?
           # 2. execute virt-install
-          log("Installing VBox #{vmname}".bold)
+          log("Installing VBox #{vmname}", :bold)
           cmdline = 'virt-install --connect qemu:///system --hvm --virt-type kvm --import --wait 0 '
           cmdline << "--arch #{vbs.vbox_arch(self)} "
           cmdline << '--autostart ' if vbs.vbox_autostart(self)
@@ -128,17 +127,18 @@ module Inprovise::VBox
           vmname = vbs.vbox_name(self)
           if trigger 'vbox:vbox-verify', vmname, true
             trigger 'vbox:vbox-shutdown', vmname
-            log.print("Waiting for shutdown of VBox #{vmname}. Please wait ...|".bold)
+            msg = "Waiting for shutdown of VBox #{vmname}. Please wait ..."
+            log.print("#{msg}|\r", :bold)
             30.times do |n|
               sleep(1)
-              log.print("\b" + %w{| / - \\}[(n+1) % 4].bold)
+              log.print("#{msg}#{%w{| / - \\}[(n+1) % 4]}\r", :bold)
               break unless trigger 'vbox:vbox-verify', vmname, true
             end
             if trigger('vbox:vbox-verify', vmname, true)
               trigger('vbox:vbox-kill', vmname)
               sleep(1)
             end
-            log.println("\bdone".bold)
+            log.println("#{msg}done", :bold)
           end
           trigger('vbox:vbox-delete', vmname) unless trigger('vbox:vbox-verify', vmname, true)
         end
@@ -162,17 +162,18 @@ module Inprovise::VBox
           vmname = vbs.vbox_name(self)
           unless vbs.vbox_no_node(self)
             # get MAC and IP for VM
-            log.print("Determining IP address for VBox #{vmname}. Please wait ...|".bold)
+            msg = "Determining IP address for VBox #{vmname}. Please wait ..."
+            log.print("#{msg}|\r", :bold)
             mac = addr = nil
             150.times do |n|
               sleep(2)
-              log.print("\b" + %w{| / - \\}[(n+1) % 4].bold)
+              log.print("#{msg}#{%w{| / - \\}[(n+1) % 4]}\r", :bold)
               mac, addr = trigger 'vbox:vbox-ifaddr', vmname
               if addr
                 break
               end
             end
-            log.println("\bdone".bold)
+            log.println("#{msg}done", :bold)
             raise RuntimeError, "Failed to determin IP address for VBox #{vmname}" unless addr
             log("VBox #{vmname} : mac=#{mac}, addr=#{addr}") if Inprovise.verbosity > 0
             vbox_opts = vbs.vbox_config_hash(self)
@@ -189,7 +190,7 @@ module Inprovise::VBox
               Inprovise::Sniffer.run_sniffers_for(node) rescue Inprovise::Sniffer.run_sniffers_for(node)
               Inprovise::Infrastructure.save
             end
-            log("Added new node #{node}".bold)
+            log("Added new node #{node}", :bold)
           end
         end
 
@@ -201,9 +202,9 @@ module Inprovise::VBox
             if tgt && Inprovise::Infrastructure::Node === tgt
               Inprovise::Infrastructure.deregister(vmname)
               Inprovise::Infrastructure.save
-              log("Removed node #{tgt}".bold)
+              log("Removed node #{tgt}", :bold)
             else
-              log("No existing node #{vmname} found!".yellow)
+              log("No existing node #{vmname} found!", :yellow)
             end
           end
         end

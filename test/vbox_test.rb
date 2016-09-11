@@ -26,13 +26,16 @@ describe Inprovise::VBox do
       script.name.must_equal 'myVbox'
     end
 
-    it 'requires a configuration' do
-      assert_raises ArgumentError do
-        script = Inprovise::DSL.module_eval do
-          vbox 'myVbox' do
-          end
+    it 'defines default configuration' do
+      script = Inprovise::DSL.module_eval do
+        vbox 'myVbox' do
         end
       end
+      script.configuration.must_be_kind_of Hash
+      script.configuration[:arch].must_equal 'x86_64'
+      script.configuration[:memory].must_equal 1024
+      script.configuration[:cpus].must_equal 1
+      script.configuration[:network].must_equal :hostnet
     end
   end
 
