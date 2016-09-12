@@ -281,25 +281,12 @@ module Inprovise::VBox
     def vbox_config_hash(context)
       context.config[name.to_sym].to_h.reduce({}) do |h, (k,v)|
         case h[k] = value_for(context, v)
-          when OpenStruct
-          h[k] = config_to_hash(h[k])
+          when Inprovise::Config
+          h[k] = h[k].to_h
         end
         h
       end
     end
-
-    def config_to_hash(cfg)
-      cfg.to_h.reduce({}) do |h, (k,v)|
-        h[k] = case v
-          when OpenStruct
-          config_to_hash(v)
-          else
-          v
-        end
-        h
-      end
-    end
-    private :config_to_hash
 
     def value_for(context, option)
       return nil if option.nil?
