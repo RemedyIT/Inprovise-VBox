@@ -35,21 +35,50 @@ module Inprovise::VBox
       end
       result
     end
+    action 'vbox-install' do |vboxname, cfg|
+      log("Installing VBox #{vboxname}", :bold)
+      log("VBox config :\n#{JSON.pretty_generate(cfg)}") if Inprovise.verbosity > 1
+      cmdline = "virt-install --connect qemu:///system --hvm --virt-type #{cfg[:virt_type] || 'kvm'} --import --wait 0 "
+      cmdline << "--arch #{cfg[:arch]} "
+      cmdline << '--autostart ' if cfg[:autostart]
+      cmdline << "--name #{vboxname} --memory #{cfg[:memory]} --vcpus #{cfg[:cpus]} "
+      cmdline << "--os-variant #{cfg[:os]} " if cfg[:os]
+      cmdline << case cfg[:network]
+                 when :hostnet
+                   "--network network=#{cfg[:netname] || 'default'} "
+                 when :bridge
+                   "--network bridge=#{cfg[:netname] || 'virbr0' } "
+                 end
+      cmdline << "--graphics #{cfg[:graphics] || 'spice'} "
+      cmdline << "--disk path=#{cfg[:image]},device=disk,boot_order=1"
+      cmdline << ",bus=#{cfg[:diskbus]}" if cfg[:diskbus]
+      cmdline << ",format=#{cfg[:format]}" if cfg[:format]
+      cmdline << " --disk device=cdrom,boot_order=2,bus=#{cfg[:cdrombus] || 'ide'}" unless cfg[:cdrom] == false
+      cmdline << %{ --boot "kernel=#{cfg[:kernel]},kernel_args=#{cfg[:kernel_args]}"} if cfg[:kernel]
+      cmdline << " #{cfg[:install_opts]}" if cfg[:install_opts]
+      sudo(cmdline, :log => true)
+    end
   end
 
   class VBoxScript < Inprovise::Script
 
     # configuration
     #     :name
+    #     :virt_type
+    #     :arch
     #     :image
     #     :format
     #     :diskbus
     #     :memory
+    #     :cdrom
+    #     :cdrombus
     #     :cpus
     #     :os
     #     :network
     #     :netname
     #     :autostart
+    #     :kernel
+    #     :kernel_args
     #     :install_opts
 
     def initialize(name)
@@ -92,30 +121,27 @@ module Inprovise::VBox
 
         # apply : installation
         apply do
-          vmname = vbs.vbox_name(self)
-          vmimg = vbs.vbox_image(self)
-          # 1. verify config
-          raise ArgumentError, "Cannot access VBox image #{vmimg}" unless remote(vmimg).file?
-          # 2. execute virt-install
-          log("Installing VBox #{vmname}", :bold)
-          cmdline = 'virt-install --connect qemu:///system --hvm --virt-type kvm --import --wait 0 '
-          cmdline << "--arch #{vbs.vbox_arch(self)} "
-          cmdline << '--autostart ' if vbs.vbox_autostart(self)
-          cmdline << "--name #{vmname} --memory #{vbs.vbox_memory(self)} --vcpus #{vbs.vbox_cpus(self)} "
-          cmdline << "--os-variant #{vbs.vbox_os(self)} " if vbs.vbox_os(self)
-          cmdline << case vbs.vbox_network(self)
-                     when :hostnet
-                       "--network network=#{vbs.vbox_netname(self) || 'default'} "
-                     when :bridge
-                       "--network bridge=#{vbs.vbox_netname(self) || 'virbr0' } "
-                     end
-          cmdline << '--graphics spice '
-          cmdline << "--disk path=#{vbs.vbox_image(self)},device=disk,boot_order=1"
-          cmdline << ",bus=#{vbs.vbox_diskbus(self)}" if vbs.vbox_diskbus(self)
-          cmdline << ",format=#{vbs.vbox_format(self)}" if vbs.vbox_format(self)
-          cmdline << ' --disk device=cdrom,boot_order=2,bus=ide'
-          cmdline << " #{vbs.vbox_install_opts(self)}" if vbs.vbox_install_opts(self)
-          sudo(cmdline)
+          # 1. trigger virt-install
+          trigger('vbox:vbox-install', vbs.vbox_name(self), {
+              :virt_type => vbs.vbox_virt_type(self),
+              :arch => vbs.vbox_arch(self),
+              :autostart => vbs.vbox_autostart(self),
+              :memory => vbs.vbox_memory(self),
+              :cpus => vbs.vbox_cpus(self),
+              :os => vbs.vbox_os(self),
+              :network => vbs.vbox_network(self) || :hostnet,
+              :netname => vbs.vbox_netname(self),
+              :graphics => vbs.vbox_graphics(self),
+              :image => vbs.vbox_image(self),
+              :diskbus => vbs.vbox_diskbus(self),
+              :format => vbs.vbox_format(self),
+              :cdrom => vbs.vbox_cdrom(self),
+              :cdrombus => vbs.vbox_cdrombus(self),
+              :kernel => vbs.vbox_kernel(self),
+              :kernel_args => vbs.vbox_kernel_args(self),
+              :install_opts => vbs.vbox_install_opts(self)
+            })
+          # wait to startup
           10.times do
             sleep(1)
             break if trigger 'vbox:vbox-verify', vmname, true, vbs.vbox_autostart(self)
@@ -222,6 +248,10 @@ module Inprovise::VBox
       value_for context, context.config[name.to_sym][:name]
     end
 
+    def vbox_virt_type(context)
+      value_for context, context.config[name.to_sym][:virt_type]
+    end
+
     def vbox_autostart(context)
       value_for context, context.config[name.to_sym][:autostart]
     end
@@ -258,6 +288,10 @@ module Inprovise::VBox
       value_for context, context.config[name.to_sym][:netname]
     end
 
+    def vbox_graphics(context)
+      value_for context, context.config[name.to_sym][:graphics]
+    end
+
     def vbox_os(context)
       value_for context, context.config[name.to_sym][:os]
     end
@@ -272,6 +306,22 @@ module Inprovise::VBox
 
     def vbox_format(context)
       value_for context, context.config[name.to_sym][:format]
+    end
+
+    def vbox_cdrom(context)
+      value_for context, context.config[name.to_sym][:cdrom]
+    end
+
+    def vbox_cdrombus(context)
+      value_for context, context.config[name.to_sym][:cdrombus]
+    end
+
+    def vbox_kernel(context)
+      value_for context, context.config[name.to_sym][:kernel]
+    end
+
+    def vbox_kernel_args(context)
+      value_for context, context.config[name.to_sym][:kernel_args]
     end
 
     def vbox_install_opts(context)
