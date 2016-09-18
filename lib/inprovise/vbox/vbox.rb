@@ -42,13 +42,20 @@ module Inprovise::VBox
       cmdline << "--arch #{cfg[:arch]} "
       cmdline << '--autostart ' if cfg[:autostart]
       cmdline << "--name #{vboxname} --memory #{cfg[:memory]} --vcpus #{cfg[:cpus]} "
-      cmdline << "--os-variant #{cfg[:os]} " if cfg[:os]
+      # check if os variant defined on this host
+      if cfg[:os]
+        os_variant = sudo("osinfo-query --fields=short-id os | grep #{cfg[:os]}").strip
+        cmdline << "--os-variant #{cfg[:os]} " unless os_variant.empty?
+      end
+      cmdline << '--network '
       cmdline << case cfg[:network]
                  when :hostnet
-                   "--network network=#{cfg[:netname] || 'default'} "
+                   "network=#{cfg[:netname] || 'default'}"
                  when :bridge
-                   "--network bridge=#{cfg[:netname] || 'virbr0' } "
+                   "bridge=#{cfg[:netname] || 'virbr0' }"
                  end
+      cmdline << ",model=#{cfg[:nic]}" if cfg[:nic]
+      cmdline << ' '
       cmdline << "--graphics #{cfg[:graphics] || 'spice'} "
       cmdline << "--disk path=#{cfg[:image]},device=disk,boot_order=1"
       cmdline << ",bus=#{cfg[:diskbus]}" if cfg[:diskbus]
@@ -76,6 +83,7 @@ module Inprovise::VBox
     #     :os
     #     :network
     #     :netname
+    #     :nic
     #     :autostart
     #     :kernel
     #     :kernel_args
@@ -131,6 +139,7 @@ module Inprovise::VBox
               :os => vbs.vbox_os(self),
               :network => vbs.vbox_network(self) || :hostnet,
               :netname => vbs.vbox_netname(self),
+              :nic => vbs.vbox_nic(self),
               :graphics => vbs.vbox_graphics(self),
               :image => vbs.vbox_image(self),
               :diskbus => vbs.vbox_diskbus(self),
@@ -294,6 +303,10 @@ module Inprovise::VBox
 
     def vbox_netname(context)
       value_for context, context.config[name.to_sym][:netname]
+    end
+
+    def vbox_nic(context)
+      value_for context, context.config[name.to_sym][:nic]
     end
 
     def vbox_graphics(context)
