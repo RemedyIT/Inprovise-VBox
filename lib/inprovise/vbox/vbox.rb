@@ -206,11 +206,19 @@ module Inprovise::VBox
             vbox_opts.delete(:no_node)
             vbox_opts.delete(:no_sniff)
             node_opts = vbox_opts.delete(:node) || {}
+            node_group = [node_opts.delete(:group)].flatten.compact
             node_opts[:host] ||= addr
             node_opts[:user] ||= vbs.vbox_user(self)
             node_opts[:vbox] = vbox_opts
             node = Inprovise::Infrastructure::Node.new(vmname, node_opts)
             Inprovise::Infrastructure.save
+            node_group.each do |grpnm|
+              grp = Inprovise::Infrastructure.find(grpnm)
+              raise ArgumentError, "Invalid Group name '#{grpnm}'." unless grp.nil? || Inprovise::Infrastructure::Group === grp
+              grp = Inprovise::Infrastructure::Group.new(grpnm) unless grp
+              node.add_to(grp)
+            end
+            Inprovise::Infrastructure.save unless node_group.empty?
             unless vbs.vbox_no_sniff(self)
               # retry on (comm) failure
               Inprovise::Sniffer.run_sniffers_for(node) rescue Inprovise::Sniffer.run_sniffers_for(node)
