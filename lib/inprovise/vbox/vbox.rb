@@ -183,12 +183,16 @@ module Inprovise::VBox
       @node_script = Inprovise::DSL.script "#{name}#vbox_node" do
 
         validate do
-          vmname = vbs.vbox_name(self)
-          if tgt = Inprovise::Infrastructure.find(vmname)
-            raise ArgumentError, "VBox #{vmname} clashes with existing group" if Inprovise::Infrastructure::Group === tgt
-            true
+          if vbs.vbox_no_node(self)
+            config.command != :revert
           else
-            false
+            vmname = vbs.vbox_name(self)
+            if tgt = Inprovise::Infrastructure.find(vmname)
+              raise ArgumentError, "VBox #{vmname} clashes with existing group" if Inprovise::Infrastructure::Group === tgt
+              true
+            else
+              false
+            end
           end
         end
 
@@ -230,7 +234,13 @@ module Inprovise::VBox
             Inprovise::Infrastructure.save unless node_group.empty?
             unless vbs.vbox_no_sniff(self)
               # retry on (comm) failure
-              Inprovise::Sniffer.run_sniffers_for(node) rescue Inprovise::Sniffer.run_sniffers_for(node)
+              begin
+                Inprovise::Sniffer.run_sniffers_for(node)
+              rescue
+                sleep(5)  # maybe VM needs more time to start up SSH
+                node.disconnect!
+                Inprovise::Sniffer.run_sniffers_for(node)
+              end
               Inprovise::Infrastructure.save
             end
             log("Added new node #{node}", :bold)
