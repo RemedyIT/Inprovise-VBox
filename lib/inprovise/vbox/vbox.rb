@@ -153,7 +153,7 @@ module Inprovise::VBox
           # wait to startup
           10.times do
             sleep(1)
-            break if trigger 'vbox:vbox-verify', vmname, true, vbs.vbox_autostart(self)
+            break if trigger 'vbox:vbox-verify', vbs.vbox_name(self), true, vbs.vbox_autostart(self)
           end
         end
 
