@@ -31,7 +31,7 @@ describe Inprovise::VBox do
         vbox 'myVbox' do
         end
       end
-      script.configuration.must_be_kind_of Hash
+      script.configuration.must_be_kind_of Inprovise::Config
       script.configuration[:arch].must_equal 'x86_64'
       script.configuration[:memory].must_equal 1024
       script.configuration[:cpus].must_equal 1
