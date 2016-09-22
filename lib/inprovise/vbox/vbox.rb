@@ -97,7 +97,7 @@ module Inprovise::VBox
 
     def setup
       # take care of defaults
-      @configuration ||= {}
+      @configuration ||= Inprovise::Config.new
       @configuration[:arch] ||= 'x86_64'
       @configuration[:memory] ||= 1024
       @configuration[:cpus] ||= 1
@@ -233,17 +233,21 @@ module Inprovise::VBox
             end
             Inprovise::Infrastructure.save unless node_group.empty?
             unless vbs.vbox_no_sniff(self)
-              # retry on (comm) failure
-              begin
-                Inprovise::Sniffer.run_sniffers_for(node)
-              rescue
-                sleep(5)  # maybe VM needs more time to start up SSH
-                node.disconnect!
-                Inprovise::Sniffer.run_sniffers_for(node)
+              (1..5).each do |i|
+                begin
+                  Inprovise::Sniffer.run_sniffers_for(node)
+                  break
+                rescue
+                  raise if i == 5
+                  sleep(5)  # maybe VM needs more time to start up SSH
+                  node.disconnect!
+                  # retry on (comm) failure
+                end
               end
               Inprovise::Infrastructure.save
             end
             log("Added new node #{node}", :bold)
+            config['vbox'] = node
           end
         end
 
@@ -265,10 +269,23 @@ module Inprovise::VBox
       end
 
       # add dependencies in correct order
-      # MUST proceed any user defined dependencies
+      # MUST preceed any user defined dependencies
       dependencies.insert(0, @vm_script.name, @node_script.name)
 
       self
+    end
+
+    # overload Script#configure
+    def configure(cfg=nil, &definition)
+      @configuration = Inprovise::Config.new.merge!(cfg) if cfg
+      if block_given?
+        vbs = self
+        command(:configure) do
+          self.instance_eval(&definition)
+          config['vbox'] = Inprovise::Infrastructure.find(config[vbs.name][:name])
+        end
+      end
+      @configuration
     end
 
     def vbox_name(context)
