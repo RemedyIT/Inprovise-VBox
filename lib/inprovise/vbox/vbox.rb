@@ -104,6 +104,8 @@ module Inprovise::VBox
       @configuration[:network] ||= :hostnet
       # generate name if none set
       @configuration[:name] ||= "#{name}_#{self.hash}_#{Time.now.to_f}"
+      # create default configuration callback
+      self.configure
 
       vbs = self
       # define the scripts that do the actual work as dependencies
@@ -278,12 +280,12 @@ module Inprovise::VBox
     # overload Script#configure
     def configure(cfg=nil, &definition)
       @configuration = Inprovise::Config.new.merge!(cfg) if cfg
-      if block_given?
-        vbs = self
-        command(:configure) do
-          self.instance_eval(&definition)
-          config['vbox'] = Inprovise::Infrastructure.find(config[vbs.name][:name])
-        end
+      vbs = self
+      config_block = block_given? ? definition : nil
+      command(:configure).clear
+      command(:configure) do
+        self.instance_eval(&config_block) if config_block
+        config['vbox'] = Inprovise::Infrastructure.find(config[vbs.name][:name])
       end
       @configuration
     end
