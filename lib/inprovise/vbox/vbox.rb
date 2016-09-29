@@ -220,6 +220,7 @@ module Inprovise::VBox
             vbox_opts = vbs.vbox_config_hash(self)
             vbox_opts.delete(:no_node)
             vbox_opts.delete(:no_sniff)
+            vbox_opts[:mac] = mac   # record mac-address
             node_opts = vbox_opts.delete(:node) || {}
             node_group = [node_opts.delete(:group)].flatten.compact
             node_opts[:host] ||= addr
