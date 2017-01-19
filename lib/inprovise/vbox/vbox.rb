@@ -61,7 +61,7 @@ module Inprovise::VBox
       cmdline << ",bus=#{cfg[:diskbus]}" if cfg[:diskbus]
       cmdline << ",format=#{cfg[:format]}" if cfg[:format]
       cmdline << " --disk device=cdrom,boot_order=2,bus=#{cfg[:cdrombus] || 'ide'}" unless cfg[:cdrom] == false
-      cmdline << %{ --boot "kernel=#{cfg[:kernel]},kernel_args=#{cfg[:kernel_args]}"} if cfg[:kernel]
+      cmdline << %{ --boot kernel=#{cfg[:kernel]},kernel_args='#{cfg[:kernel_args]}'} if cfg[:kernel]
       cmdline << " #{cfg[:install_opts]}" if cfg[:install_opts]
       sudo(cmdline, :log => true)
     end
