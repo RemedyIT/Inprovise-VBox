@@ -1,7 +1,7 @@
 before_install:
 - gem install bundler
 bundler_args: "--verbose"
-script: rake test
+script: bundle exec rake test
 rvm:
 - 2.0.0
 - 2.1
@@ -14,11 +14,11 @@ matrix:
   allow_failures:
   - rvm: ruby-head
 env: CODECLIMATE_REPO_TOKEN=109e18d2cc2d09d4d257bc89b8f80095cc3fd331c698ac2c4d6ebf16344135e0
-  bundle exec rake
-  bundle exec codeclimate-test-reporter
 addons:
   code_climate:
     repo_token: 109e18d2cc2d09d4d257bc89b8f80095cc3fd331c698ac2c4d6ebf16344135e0
+after_success:
+  - bundle exec codeclimate-test-reporter
 deploy:
   provider: rubygems
   api_key:
