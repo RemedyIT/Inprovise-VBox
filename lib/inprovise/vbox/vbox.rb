@@ -236,13 +236,13 @@ module Inprovise::VBox
             end
             Inprovise::Infrastructure.save unless node_group.empty?
             unless vbs.vbox_no_sniff(self)
-              (1..5).each do |i|
+              (1..10).each do |i|
                 begin
                   Inprovise::Sniffer.run_sniffers_for(node)
                   break
                 rescue
-                  raise if i == 5
-                  sleep(5)  # maybe VM needs more time to start up SSH
+                  raise if i == 10
+                  sleep(i)  # maybe VM needs more time to start up SSH
                   node.disconnect!
                   # retry on (comm) failure
                 end
