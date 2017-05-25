@@ -242,7 +242,7 @@ module Inprovise::VBox
                   break
                 rescue
                   raise if i == 10
-                  sleep(i)  # maybe VM needs more time to start up SSH
+                  sleep(5)  # maybe VM needs more time to start up SSH
                   node.disconnect!
                   # retry on (comm) failure
                 end
