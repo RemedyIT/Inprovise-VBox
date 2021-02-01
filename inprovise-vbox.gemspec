@@ -5,7 +5,7 @@ Gem::Specification.new do |gem|
   gem.email         = ["mcorino@remedy.nl"]
   gem.description   = %q{VBox script extension for Inprovise}
   gem.summary       = %q{Simple, easy and intuitive virtual machine provisioning}
-  gem.homepage      = ""
+  gem.homepage      = "https://github.com/RemedyIT/Inprovise-VBox"
 
   gem.files         = `git ls-files`.split($\)
   gem.executables   = gem.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
