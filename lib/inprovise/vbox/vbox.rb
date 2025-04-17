@@ -45,7 +45,11 @@ module Inprovise::VBox
       # check if os variant defined on this host
       if cfg[:os]
         os_variant = sudo("osinfo-query --fields=short-id os | grep #{cfg[:os]}").strip
-        cmdline << "--os-variant #{cfg[:os]} " unless os_variant.empty?
+        unless os_variant.empty?
+          cmdline << "--os-variant #{cfg[:os]} "
+        else
+          cmdline << "--osinfo detect=on,require=off "
+        end
       end
       cmdline << '--network '
       cmdline << case cfg[:network]
