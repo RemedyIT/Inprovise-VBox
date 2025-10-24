@@ -57,6 +57,8 @@ module Inprovise::VBox
                    "network=#{cfg[:netname] || 'default'}"
                  when :bridge
                    "bridge=#{cfg[:netname] || 'virbr0' }"
+                 when :direct
+                   "type=direct,source=#{cfg[:source]}"
                  end
       cmdline << ",model=#{cfg[:nic]}" if cfg[:nic]
       cmdline << ' '
