@@ -5,6 +5,6 @@
 
 module Inprovise; module VBox
 
-  VERSION = '0.2.16'
+  VERSION = '0.2.17'
 
 end; end

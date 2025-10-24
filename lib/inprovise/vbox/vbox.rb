@@ -147,6 +147,7 @@ module Inprovise::VBox
               :os => vbs.vbox_os(self),
               :network => vbs.vbox_network(self) || :hostnet,
               :netname => vbs.vbox_netname(self),
+              :source=> vbs.vbox_source(self),
               :nic => vbs.vbox_nic(self),
               :graphics => vbs.vbox_graphics(self),
               :image => vbs.vbox_image(self),
@@ -221,7 +222,7 @@ module Inprovise::VBox
               end
             end
             log.println("#{msg}done", :bold)
-            raise RuntimeError, "Failed to determin IP address for VBox #{vmname}" unless addr
+            raise RuntimeError, "Failed to determine IP address for VBox #{vmname}" unless addr
             log("VBox #{vmname} : mac=#{mac}, addr=#{addr}") if Inprovise.verbosity > 0
             vbox_opts = vbs.vbox_config_hash(self)
             vbox_opts.delete(:no_node)
@@ -339,6 +340,10 @@ module Inprovise::VBox
 
     def vbox_netname(context)
       value_for context, context.config[name.to_sym][:netname]
+    end
+
+    def vbox_source(context)
+      value_for context, context.config[name.to_sym][:source]
     end
 
     def vbox_nic(context)
