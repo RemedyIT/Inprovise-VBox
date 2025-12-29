@@ -24,7 +24,7 @@ module Inprovise::VBox
         (!autostart || vbox_info =~ /autostart:\s+enable/i)
     end
     action('vbox-delete') do |vboxname|
-      sudo("virsh undefine #{vboxname}")
+      sudo("virsh undefine --nvram #{vboxname}")
     end
     action 'vbox-ifaddr' do |vboxname|
       result = []
