@@ -35,7 +35,7 @@ vbox 'myvm' do
       :name => 'MyVM',
       :image => '/remote/image/path',
       :memory => 1024,
-      :cpus => 2  
+      :cpu_cores => 4  
     })
 
 end
