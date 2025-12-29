@@ -41,7 +41,8 @@ module Inprovise::VBox
       cmdline = "virt-install --connect qemu:///system --hvm --virt-type #{cfg[:virt_type] || 'kvm'} --import --wait 0 "
       cmdline << "--arch #{cfg[:arch]} "
       cmdline << '--autostart ' if cfg[:autostart]
-      cmdline << "--name #{vboxname} --memory #{cfg[:memory]} --vcpus #{cfg[:cpus]} "
+      cmdline << "--name #{vboxname} --memory #{cfg[:memory]} "
+      cmdline << "--cpu #{cfg[:cpu_model]},topology.sockets=#{cfg[:cpu_sockets]},topology.cores=#{cfg[:cpu_cores]},topology.threads=#{cfg[:cpu_threads]} "
       # check if os variant defined on this host
       if cfg[:os]
         os_variant = sudo("osinfo-query --fields=short-id os | grep #{cfg[:os]}").strip
@@ -85,7 +86,10 @@ module Inprovise::VBox
     #     :memory
     #     :cdrom
     #     :cdrombus
-    #     :cpus
+    #     :cpu_model
+    #     :cpu_sockets
+    #     :cpu_cores
+    #     :cpu_threads
     #     :os
     #     :network
     #     :netname
@@ -106,7 +110,10 @@ module Inprovise::VBox
       @configuration ||= Inprovise::Config.new
       @configuration[:arch] ||= 'x86_64'
       @configuration[:memory] ||= 1024
-      @configuration[:cpus] ||= 1
+      @configuration[:cpu_model] ||= 'host-model'
+      @configuration[:cpu_sockets] ||= 1
+      @configuration[:cpu_cores] ||= 2
+      @configuration[:cpu_threads] ||= 1
       @configuration[:network] ||= :hostnet
       # generate name if none set
       @configuration[:name] ||= "#{name}_#{self.hash}_#{Time.now.to_f}"
@@ -143,7 +150,10 @@ module Inprovise::VBox
               :arch => vbs.vbox_arch(self),
               :autostart => vbs.vbox_autostart(self),
               :memory => vbs.vbox_memory(self),
-              :cpus => vbs.vbox_cpus(self),
+              :cpu_model => vbs.vbox_cpu_model(self),
+              :cpu_sockets => vbs.vbox_cpu_sockets(self),
+              :cpu_cores => vbs.vbox_cpu_cores(self),
+              :cpu_threads => vbs.vbox_cpu_threads(self),
               :os => vbs.vbox_os(self),
               :network => vbs.vbox_network(self) || :hostnet,
               :netname => vbs.vbox_netname(self),
@@ -330,8 +340,20 @@ module Inprovise::VBox
       value_for context, context.config[name.to_sym][:memory]
     end
 
-    def vbox_cpus(context)
-      value_for context, context.config[name.to_sym][:cpus]
+    def vbox_cpu_model
+      value_for context, context.config[name.to_sym][:cpu_model]
+    end
+
+    def vbox_cpu_sockets
+      value_for context, context.config[name.to_sym][:cpu_sockets]
+    end
+
+    def vbox_cpu_cores
+      value_for context, context.config[name.to_sym][:cpu_cores]
+    end
+
+    def vbox_cpu_threads
+      value_for context, context.config[name.to_sym][:cpu_threads]
     end
 
     def vbox_network(context)
