@@ -340,19 +340,19 @@ module Inprovise::VBox
       value_for context, context.config[name.to_sym][:memory]
     end
 
-    def vbox_cpu_model
+    def vbox_cpu_model(context)
       value_for context, context.config[name.to_sym][:cpu_model]
     end
 
-    def vbox_cpu_sockets
+    def vbox_cpu_sockets(context)
       value_for context, context.config[name.to_sym][:cpu_sockets]
     end
 
-    def vbox_cpu_cores
+    def vbox_cpu_cores(context)
       value_for context, context.config[name.to_sym][:cpu_cores]
     end
 
-    def vbox_cpu_threads
+    def vbox_cpu_threads(context)
       value_for context, context.config[name.to_sym][:cpu_threads]
     end
 
